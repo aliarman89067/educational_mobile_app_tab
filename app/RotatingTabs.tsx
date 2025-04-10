@@ -1,129 +1,113 @@
 import React, { useRef } from "react";
-import { StyleSheet, View } from "react-native";
 import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+  StyleSheet,
+  View,
+  PanResponder,
+  Animated,
+  Dimensions,
+} from "react-native";
 import Entypo from "@expo/vector-icons/Entypo";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 
+const { width, height } = Dimensions.get("window");
+
 const RotatingTabs = () => {
-  const rotation = useSharedValue(0);
-  const savedRotation = useSharedValue(0);
-  const circleRef = useRef<View>(null);
+  const rotation = useRef(new Animated.Value(0)).current;
+  const rotationValue = useRef(0);
+  const startTouchAngle = useRef(0); // Stores the initial touch angle
 
-  // Calculate icon positions based on rotation
-  const getIconStyle = (index: number) => {
-    const angle = index * 90 * (Math.PI / 180);
-    const radius = 130;
-    return useAnimatedStyle(() => {
-      const currentAngle = angle + rotation.value * (Math.PI / 180);
-      return {
-        left: 150 + radius * Math.sin(currentAngle) - 20,
-        top: 150 + radius * -Math.cos(currentAngle) - 20,
-      };
-    });
-  };
+  const center = { x: 150, y: 150 }; // center of the circle
 
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      savedRotation.value = rotation.value;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: (_, gesture) => {
+        const initialX = gesture.x0 - (width / 2 - 150);
+        const initialY = gesture.y0 - (height - 150 - 100);
+        const initialAngle = Math.atan2(
+          initialY - center.y,
+          initialX - center.x
+        );
+        startTouchAngle.current = initialAngle * (180 / Math.PI);
+      },
+      onPanResponderMove: (_, gesture) => {
+        const x = gesture.moveX - (width / 2 - 150);
+        const y = gesture.moveY - (height - 150 - 100);
+        const angle = Math.atan2(y - center.y, x - center.x);
+        const degrees = angle * (180 / Math.PI);
+        const angleDiff = degrees - startTouchAngle.current;
+        let newRotation = rotationValue.current + angleDiff;
+        newRotation = newRotation % 360;
+        if (newRotation < 0) newRotation += 360;
+        rotationValue.current = newRotation;
+        rotation.setValue(newRotation);
+        startTouchAngle.current = degrees;
+      },
+      onPanResponderRelease: (_, gesture) => {},
     })
-    .onUpdate((e) => {
-      if (circleRef.current) {
-        circleRef.current.measure((x, y, width, height, pageX, pageY) => {
-          const centerX = pageX + width / 2;
-          const centerY = pageY + height / 2;
-          const angle =
-            Math.atan2(e.absoluteX - centerX, centerY - e.absoluteY) *
-            (180 / Math.PI);
-          rotation.value = withSpring(angle, {
-            damping: 20,
-            stiffness: 100,
-          });
-        });
-      }
-    });
+  ).current;
 
-  const animatedCircleStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-  }));
-
-  const animatedIconStyle = (index: number) =>
-    useAnimatedStyle(() => ({
-      transform: [{ rotate: `${-rotation.value}deg` }],
-    }));
+  const rotateInterpolate = rotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ["0deg", "360deg"],
+  });
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <View style={styles.wrapper}>
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            ref={circleRef}
-            style={[styles.circle, animatedCircleStyle]}
-          >
-            {/* Top icon */}
-            <Animated.View style={[styles.icon, getIconStyle(0)]}>
-              <Entypo
-                name="home"
-                size={20}
-                color="black"
-                style={[styles.iconContent, animatedIconStyle(0)]}
-              />
-            </Animated.View>
+    <View style={styles.wrapper}>
+      <Animated.View
+        renderToHardwareTextureAndroid={true}
+        style={[styles.circle, { transform: [{ rotate: rotateInterpolate }] }]}
+        {...panResponder.panHandlers}
+      >
+        {/* Top */}
+        <View
+          style={[
+            styles.icon,
+            { top: 5, left: "50%", transform: [{ translateX: -20 }] },
+          ]}
+        >
+          <Entypo name="home" size={20} color="black" />
+        </View>
 
-            {/* Bottom icon */}
-            <Animated.View style={[styles.icon, getIconStyle(2)]}>
-              <FontAwesome5
-                name="user-alt"
-                size={20}
-                color="black"
-                style={[styles.iconContent, animatedIconStyle(2)]}
-              />
-            </Animated.View>
+        {/* Bottom */}
+        <View
+          style={[
+            styles.icon,
+            { bottom: 5, left: "50%", transform: [{ translateX: -20 }] },
+          ]}
+        >
+          <FontAwesome5 name="user-alt" size={20} color="black" />
+        </View>
 
-            {/* Left icon */}
-            <Animated.View style={[styles.icon, getIconStyle(3)]}>
-              <FontAwesome6
-                name="newspaper"
-                size={20}
-                color="black"
-                style={[styles.iconContent, animatedIconStyle(3)]}
-              />
-            </Animated.View>
+        {/* Left */}
+        <View
+          style={[
+            styles.icon,
+            { top: "50%", left: 5, transform: [{ translateY: -20 }] },
+          ]}
+        >
+          <FontAwesome6 name="newspaper" size={20} color="black" />
+        </View>
 
-            {/* Right icon */}
-            <Animated.View style={[styles.icon, getIconStyle(1)]}>
-              <FontAwesome
-                name="users"
-                size={20}
-                color="black"
-                style={[styles.iconContent, animatedIconStyle(1)]}
-              />
-            </Animated.View>
+        {/* Right */}
+        <View
+          style={[
+            styles.icon,
+            { top: "50%", right: 5, transform: [{ translateY: -20 }] },
+          ]}
+        >
+          <FontAwesome name="users" size={20} color="black" />
+        </View>
 
-            <View style={styles.innerCircle} />
-          </Animated.View>
-        </GestureDetector>
-      </View>
-    </GestureHandlerRootView>
+        <View style={styles.innerCircle} />
+      </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   wrapper: {
     position: "absolute",
     left: "50%",
@@ -148,9 +132,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     position: "absolute",
     zIndex: 10,
-  },
-  iconContent: {
-    transform: [{ rotate: "0deg" }],
   },
   innerCircle: {
     width: 200,
